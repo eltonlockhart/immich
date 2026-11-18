@@ -23,6 +23,7 @@ import {
   AssetVisibility,
   CacheControl,
   ChecksumAlgorithm,
+  DownloadFileTypeExposure,
   JobName,
   Permission,
   StorageFolder,
@@ -35,6 +36,7 @@ import { asUploadRequest, onBeforeLink } from 'src/utils/asset.util.js';
 import { isAssetChecksumConstraint } from 'src/utils/database.js';
 import { ImmichFileResponse, getFileNameWithoutExtension, getFilenameExtension } from 'src/utils/file.js';
 import { mimeTypes } from 'src/utils/mime-types.js';
+import { getPreferences } from 'src/utils/preferences.js';
 import { fromChecksum } from 'src/utils/request.js';
 
 export interface AssetMediaRedirectResponse {
@@ -241,7 +243,12 @@ export class AssetMediaService extends BaseService {
     }
   }
 
-  async downloadOriginal(auth: AuthDto, id: string, dto: AssetDownloadOriginalDto): Promise<ImmichFileResponse> {
+  async downloadOriginal(
+    auth: AuthDto,
+    id: string,
+    dto: AssetDownloadOriginalDto,
+    options?: { attachment?: boolean },
+  ): Promise<ImmichFileResponse> {
     await this.requireAccess({ auth, permission: Permission.AssetDownload, ids: [id] });
 
     const { originalPath, originalFileName, editedPath } = await this.assetRepository.getForOriginal(
@@ -250,12 +257,23 @@ export class AssetMediaService extends BaseService {
     );
 
     const path = editedPath ?? originalPath!;
+    const fileName = getFileNameWithoutExtension(originalFileName) + getFilenameExtension(path);
+    const attachment = options?.attachment === true;
+    let contentType = mimeTypes.lookup(path);
+
+    if (attachment) {
+      const metadata = await this.userRepository.getMetadata(auth.user.id);
+      if (getPreferences(metadata).download.fileTypeExposure === DownloadFileTypeExposure.File) {
+        contentType = 'application/octet-stream';
+      }
+    }
 
     return new ImmichFileResponse({
       path,
-      fileName: getFileNameWithoutExtension(originalFileName) + getFilenameExtension(path),
-      contentType: mimeTypes.lookup(path),
+      fileName,
+      contentType,
       cacheControl: CacheControl.PrivateWithCache,
+      ...(attachment ? { disposition: 'attachment' as const } : {}),
     });
   }
 

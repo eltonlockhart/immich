@@ -1,6 +1,6 @@
 <script lang="ts">
   import { shortcuts } from '#lib/actions/shortcut.ts';
-  import { zoomImageAction } from '#lib/actions/zoom-image.ts';
+  import { applyViewerTouchAction, zoomImageAction } from '#lib/actions/zoom-image.ts';
   import AdaptiveImage from '#lib/components/AdaptiveImage.svelte';
   import AssetViewerEvents from '#lib/components/AssetViewerEvents.svelte';
   import Thumbhash from '#lib/components/Thumbhash.svelte';
@@ -202,6 +202,14 @@
 
     boundingBoxes = result;
   });
+
+  // Swipe handling sets touch-action to none while attaching. Put the callout back afterwards.
+  $effect(() => {
+    if (!element) {
+      return;
+    }
+    applyViewerTouchAction(element, !(sharedLink && !sharedLink.allowDownload));
+  });
 </script>
 
 <AssetViewerEvents {onCopy} {onZoom} {onFaceEditModeChange} />
@@ -218,6 +226,7 @@
 <div
   bind:this={element}
   class="relative size-full select-none"
+  data-allow-callout={sharedLink && !sharedLink.allowDownload ? 'false' : 'true'}
   bind:clientWidth={containerWidth}
   bind:clientHeight={containerHeight}
   role="presentation"

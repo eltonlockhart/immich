@@ -13,13 +13,12 @@ import { executeMutation, readPreloadedQuery } from '#lib/queries/client.ts';
 import { getUserConfigQuery } from '#lib/queries/config-user.query.ts';
 import { Route } from '#lib/route.ts';
 import { SlideshowState, slideshowStore } from '#lib/stores/slideshow.store.ts';
-import { downloadUrl, getAssetMediaUrl, getSharedLink, sleep } from '#lib/utils.ts';
+import { downloadUrl, getAssetDownloadUrl, getSharedLink, sleep } from '#lib/utils.ts';
 import type { OnFavorite } from '#lib/utils/actions.ts';
 import { handleError } from '#lib/utils/handle-error.ts';
 import { getFormatter } from '#lib/utils/i18n.ts';
 import {
   AssetJobName,
-  AssetMediaSize,
   AssetTypeEnum,
   AssetVisibility,
   bulkTagAssets,
@@ -466,7 +465,7 @@ export const handleDownloadAsset = async (asset: AssetResponseDto, { edited }: {
 
     try {
       toastManager.primary($t('downloading_asset_filename', { values: { filename } }));
-      downloadUrl(getAssetMediaUrl({ id, size: AssetMediaSize.Original, edited, cacheKey }), filename);
+      downloadUrl(getAssetDownloadUrl({ id, fileName: filename, edited, cacheKey }), filename);
     } catch (error) {
       handleError(error, $t('errors.error_downloading', { values: { filename } }));
     }

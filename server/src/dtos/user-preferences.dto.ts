@@ -1,6 +1,11 @@
 import { createZodDto } from 'nestjs-zod';
 import z from 'zod';
-import { AssetOrderSchema, PersonUpdateStrategySchema, UserAvatarColorSchema } from 'src/enum.js';
+import {
+  AssetOrderSchema,
+  DownloadFileTypeExposureSchema,
+  PersonUpdateStrategySchema,
+  UserAvatarColorSchema,
+} from 'src/enum.js';
 import type { UserPreferences } from 'src/types.js';
 
 const AlbumsUpdateSchema = z
@@ -80,6 +85,9 @@ const EmailNotificationsUpdateSchema = z
 const DownloadUpdateSchema = z
   .object({
     archiveSize: z.int().min(1).optional().describe('Maximum archive size in bytes'),
+    fileTypeExposure: DownloadFileTypeExposureSchema.optional().describe(
+      'How a downloaded file is labeled. media uses the image or video content type. file uses a generic file type.',
+    ),
     includeEmbeddedVideos: z.boolean().optional().describe('Whether to include embedded videos in downloads'),
   })
   .optional()
@@ -186,6 +194,9 @@ const EmailNotificationsResponseSchema = z
 const DownloadResponseSchema = z
   .object({
     archiveSize: z.int().describe('Maximum archive size in bytes'),
+    fileTypeExposure: DownloadFileTypeExposureSchema.optional().describe(
+      'How a downloaded file is labeled. media uses the image or video content type. file uses a generic file type.',
+    ),
     includeEmbeddedVideos: z.boolean().describe('Whether to include embedded videos in downloads'),
   })
   .meta({ id: 'DownloadResponse' });

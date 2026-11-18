@@ -5016,6 +5016,98 @@
         "x-immich-state": "Stable"
       }
     },
+    "/assets/{id}/original/{fileName}": {
+      "get": {
+        "description": "Downloads the original file at a URL that ends with its filename. Phones use that name and extension, together with the content type, to decide whether to offer a photo library or a generic file app. A mismatched filename redirects to the canonical one.",
+        "operationId": "downloadAssetFile",
+        "parameters": [
+          {
+            "name": "edited",
+            "required": false,
+            "in": "query",
+            "description": "Return edited asset if available",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "fileName",
+            "required": true,
+            "in": "path",
+            "description": "Canonical asset filename, including its extension",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "key",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "slug",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Download original asset as a named file",
+        "tags": [
+          "Assets"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v3",
+            "state": "Added"
+          },
+          {
+            "version": "v3",
+            "state": "Stable"
+          }
+        ],
+        "x-immich-permission": "asset.download",
+        "x-immich-state": "Stable"
+      }
+    },
     "/assets/{id}/thumbnail": {
       "get": {
         "description": "Retrieve the thumbnail image for the specified asset. Viewing the fullsize thumbnail might redirect to downloadAsset, which requires a different permission.",
@@ -22573,6 +22665,14 @@
         ],
         "type": "object"
       },
+      "DownloadFileTypeExposure": {
+        "description": "How a downloaded file is exposed to the device",
+        "enum": [
+          "media",
+          "file"
+        ],
+        "type": "string"
+      },
       "DownloadInfoDto": {
         "properties": {
           "albumId": {
@@ -22612,6 +22712,10 @@
             "maximum": 9007199254740991,
             "minimum": -9007199254740991,
             "type": "integer"
+          },
+          "fileTypeExposure": {
+            "$ref": "#/components/schemas/DownloadFileTypeExposure",
+            "description": "How a downloaded file is labeled. media uses the image or video content type. file uses a generic file type."
           },
           "includeEmbeddedVideos": {
             "description": "Whether to include embedded videos in downloads",
@@ -22653,6 +22757,10 @@
             "maximum": 9007199254740991,
             "minimum": 1,
             "type": "integer"
+          },
+          "fileTypeExposure": {
+            "$ref": "#/components/schemas/DownloadFileTypeExposure",
+            "description": "How a downloaded file is labeled. media uses the image or video content type. file uses a generic file type."
           },
           "includeEmbeddedVideos": {
             "description": "Whether to include embedded videos in downloads",

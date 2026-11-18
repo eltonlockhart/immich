@@ -38,7 +38,7 @@ import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { AssetMediaService } from 'src/services/asset-media.service.js';
 import type { UploadFiles } from 'src/types.js';
 import { ImmichFileResponse, sendFile } from 'src/utils/file.js';
-import { FileNotEmptyValidator, UUIDParamDto } from 'src/validation.js';
+import { FileNotEmptyValidator, OriginalDownloadParamDto, UUIDParamDto } from 'src/validation.js';
 
 @ApiTags(ApiTag.Assets)
 @Controller(RouteKey.Asset)
@@ -105,6 +105,38 @@ export class AssetMediaController {
     @Next() next: NextFunction,
   ) {
     await sendFile(res, next, () => this.service.downloadOriginal(auth, id, dto), this.logger);
+  }
+
+  @Get(':id/original/:fileName')
+  @FileResponse()
+  @Authenticated({ permission: Permission.AssetDownload, sharedLink: true })
+  @Endpoint({
+    summary: 'Download original asset as a named file',
+    description:
+      'Downloads the original file at a URL that ends with its filename. Phones use that name and extension, together with the content type, to decide whether to offer a photo library or a generic file app. A mismatched filename redirects to the canonical one.',
+    history: new HistoryBuilder().added('v3').stable('v3'),
+  })
+  async downloadAssetFile(
+    @Auth() auth: AuthDto,
+    @Param() { id, fileName }: OriginalDownloadParamDto,
+    @Query() dto: AssetDownloadOriginalDto,
+    @Req() req: Request,
+    @Res() res: Response,
+    @Next() next: NextFunction,
+  ) {
+    const file = await this.service.downloadOriginal(auth, id, dto, { attachment: true });
+    if (file.fileName && file.fileName !== fileName) {
+      const params = new URLSearchParams();
+      for (const [key, value] of Object.entries(req.query)) {
+        if (typeof value === 'string') {
+          params.set(key, value);
+        }
+      }
+      const query = params.toString();
+      return res.redirect(HttpStatus.FOUND, `${encodeURIComponent(file.fileName)}${query ? `?${query}` : ''}`);
+    }
+
+    await sendFile(res, next, () => Promise.resolve(file), this.logger);
   }
 
   @Get(':id/thumbnail')
