@@ -238,6 +238,21 @@ export const getAssetMediaUrl = (options: AssetUrlOptions) => {
   return createUrl(path, { ...authManager.params, size: isOriginal ? undefined : size, c, edited });
 };
 
+/** Original file at a URL that ends with its filename, so a phone can tell an image or video from a generic file. */
+export const getAssetDownloadUrl = (options: {
+  id: string;
+  fileName: string;
+  cacheKey?: string | null;
+  edited: boolean;
+}) => {
+  const { id, fileName, cacheKey: c, edited } = options;
+  return createUrl(`${getAssetOriginalPath(id)}/${encodeURIComponent(fileName)}`, {
+    ...authManager.params,
+    c,
+    edited,
+  });
+};
+
 export const getAssetPlaybackUrl = (options: AssetUrlOptions) => {
   const { id, cacheKey: c } = options;
   return createUrl(getAssetPlaybackPath(id), { ...authManager.params, c });

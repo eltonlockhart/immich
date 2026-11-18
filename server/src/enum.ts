@@ -84,6 +84,18 @@ export enum AssetOrder {
 
 export const AssetOrderSchema = z.enum(AssetOrder).describe('Asset sort order').meta({ id: 'AssetOrder' });
 
+export enum DownloadFileTypeExposure {
+  /** Advertise the real image or video type so devices can offer a photo library. */
+  Media = 'media',
+  /** Advertise a generic file so devices offer a file app instead of a photo library. */
+  File = 'file',
+}
+
+export const DownloadFileTypeExposureSchema = z
+  .enum(DownloadFileTypeExposure)
+  .describe('How a downloaded file is exposed to the device')
+  .meta({ id: 'DownloadFileTypeExposure' });
+
 export enum AssetOrderBy {
   TakenAt = 'takenAt',
   CreatedAt = 'createdAt',

@@ -98,6 +98,13 @@ const UUIDParamSchema = z.object({
 
 export class UUIDParamDto extends createZodDto(UUIDParamSchema) {}
 
+const OriginalDownloadParamSchema = z.object({
+  id: z.uuidv4(),
+  fileName: z.string().min(1),
+});
+
+export class OriginalDownloadParamDto extends createZodDto(OriginalDownloadParamSchema) {}
+
 const UUIDv7ParamSchema = z.object({
   id: z.uuidv7(),
 });

@@ -12,6 +12,7 @@ import {
   AacProfile,
   AssetOrder,
   AssetType,
+  DownloadFileTypeExposure,
   Av1Profile,
   ColorMatrix,
   ColorPrimaries,
@@ -597,6 +598,7 @@ export type UserPreferences = {
   };
   download: {
     archiveSize: number;
+    fileTypeExposure: DownloadFileTypeExposure;
     includeEmbeddedVideos: boolean;
   };
   purchase: {

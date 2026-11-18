@@ -923,6 +923,8 @@
   "download_canceled": "Download canceled",
   "download_complete": "Download complete",
   "download_enqueue": "Download enqueued",
+  "download_expose_as_media": "Expose downloads as photos and videos",
+  "download_expose_as_media_description": "iPhone and iPad can then offer Photos for a picture or video. Turn this off to label the download as a generic file, which those devices open in Files.",
   "download_failed": "Download failed",
   "download_finished": "Download finished",
   "download_include_embedded_motion_videos": "Embedded videos",

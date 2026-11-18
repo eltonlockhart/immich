@@ -12,6 +12,7 @@
 
   let archiveSize = $state(convertFromBytes(authManager.preferences.download.archiveSize || 4, ByteUnit.GiB));
   let includeEmbeddedVideos = $state(authManager.preferences.download.includeEmbeddedVideos);
+  let exposeAsMedia = $state(authManager.preferences.download.fileTypeExposure !== 'file');
 
   const updatePreferences = createMutation(() => updateMyPreferencesMutation());
 
@@ -19,7 +20,11 @@
     updatePreferences.mutate([
       {
         userPreferencesUpdateDto: {
-          download: { archiveSize: Math.floor(convertToBytes(archiveSize, ByteUnit.GiB)), includeEmbeddedVideos },
+          download: {
+            archiveSize: Math.floor(convertToBytes(archiveSize, ByteUnit.GiB)),
+            fileTypeExposure: exposeAsMedia ? 'media' : 'file',
+            includeEmbeddedVideos,
+          },
         },
       },
     ]);
@@ -39,6 +44,11 @@
           description={$t('archive_size_description')}
           bind:value={archiveSize}
         />
+        <SettingSwitch
+          title={$t('download_expose_as_media')}
+          subtitle={$t('download_expose_as_media_description')}
+          bind:checked={exposeAsMedia}
+        ></SettingSwitch>
         <SettingSwitch
           title={$t('download_include_embedded_motion_videos')}
           subtitle={$t('download_include_embedded_motion_videos_description')}

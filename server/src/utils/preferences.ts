@@ -1,6 +1,6 @@
 import { get, isEqual, set } from 'lodash-es';
 import { UserPreferencesUpdateDto } from 'src/dtos/user-preferences.dto.js';
-import { AssetOrder, PersonUpdateStrategy, UserMetadataKey } from 'src/enum.js';
+import { AssetOrder, DownloadFileTypeExposure, PersonUpdateStrategy, UserMetadataKey } from 'src/enum.js';
 import type { DeepPartial, UserMetadataItem, UserPreferences } from 'src/types.js';
 import { HumanReadableSize } from 'src/utils/bytes.js';
 import { getKeysDeep } from 'src/utils/misc.js';
@@ -43,6 +43,7 @@ const getDefaultPreferences = (): UserPreferences => {
     },
     download: {
       archiveSize: HumanReadableSize.GiB * 4,
+      fileTypeExposure: DownloadFileTypeExposure.Media,
       includeEmbeddedVideos: false,
     },
     purchase: {

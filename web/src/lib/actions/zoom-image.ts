@@ -9,6 +9,20 @@ type TouchEventLike = {
 };
 const asTouchEvent = (event: Event) => event as unknown as TouchEventLike;
 
+/** iOS shows Save to Photos only when touch-action is not `none` and the touch callout is allowed. */
+export const applyViewerTouchAction = (node: HTMLElement, allowCallout: boolean) => {
+  if (allowCallout) {
+    node.style.touchAction = 'manipulation';
+    node.style.setProperty('-webkit-touch-callout', 'default');
+    return;
+  }
+
+  node.style.touchAction = 'none';
+  node.style.setProperty('-webkit-touch-callout', 'none');
+};
+
+const calloutAllowed = (node: HTMLElement) => node.dataset.allowCallout !== 'false';
+
 export const zoomImageAction = (options?: { zoomTarget?: HTMLElement }) => (node: HTMLElement) => {
   const zoomInstance = createZoomImageWheel(node, {
     maxZoom: 10,
@@ -121,7 +135,29 @@ export const zoomImageAction = (options?: { zoomTarget?: HTMLElement }) => (node
   );
 
   node.style.overflow = 'visible';
-  node.style.touchAction = 'none';
+  applyViewerTouchAction(node, calloutAllowed(node));
+
+  // A second finger is a pinch. Claim the gesture then, and give a stationary long-press back to iOS.
+  node.addEventListener(
+    'touchstart',
+    (event) => {
+      if (calloutAllowed(node) && asTouchEvent(event).touches.length >= 2) {
+        node.style.touchAction = 'none';
+      }
+    },
+    { capture: true, passive: false, signal },
+  );
+  const restoreCallout = () => applyViewerTouchAction(node, calloutAllowed(node));
+  node.addEventListener(
+    'touchend',
+    (event) => {
+      if (asTouchEvent(event).touches.length === 0) {
+        restoreCallout();
+      }
+    },
+    { capture: true, signal },
+  );
+  node.addEventListener('touchcancel', restoreCallout, { capture: true, signal });
 
   const unsubscribes = untrack(() => [
     assetViewerManager.on({ ZoomChange: (state) => zoomInstance.setState(state) }),
