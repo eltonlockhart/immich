@@ -1,0 +1,94 @@
+#
+# Side-by-side PoC on the Portainer host (10.0.0.20).
+# - Cloned Postgres (prod dump) so smart-search embeddings work
+# - Prod library mounted read-only
+# - UI on :2285 (prod :2283, ios-test :2284)
+#
+name: immich-inspect-poc
+
+services:
+  immich-server:
+    image: immich-inspect-poc:latest
+    build:
+      context: ..
+      dockerfile: server/Dockerfile
+    container_name: immich_inspect_server
+    restart: unless-stopped
+    ports:
+      - '2285:2283'
+    environment:
+      TZ: Australia/Brisbane
+      DB_HOSTNAME: database
+      DB_USERNAME: postgres
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_DATABASE_NAME: immich
+      REDIS_HOSTNAME: redis
+      IMMICH_WORKERS_INCLUDE: api
+      IMMICH_IGNORE_MOUNT_CHECK_ERRORS: 'true'
+    volumes:
+      - /mnt/nas/docker/immich/library:/data:ro
+      - type: volume
+        source: synology-photos-inspect
+        target: /external/media
+        read_only: true
+      - type: bind
+        source: /mnt/media/Photos
+        target: /external/photos
+        read_only: true
+        bind:
+          create_host_path: false
+      - /etc/localtime:/etc/localtime:ro
+    depends_on:
+      - database
+      - redis
+    healthcheck:
+      disable: false
+
+  immich-machine-learning:
+    image: ghcr.io/immich-app/immich-machine-learning:v3-openvino
+    container_name: immich_inspect_ml
+    restart: unless-stopped
+    devices:
+      - /dev/dri:/dev/dri
+    environment:
+      TZ: Australia/Brisbane
+      MACHINE_LEARNING_MODEL_REVISION: v2
+      MACHINE_LEARNING_WORKERS: '1'
+    volumes:
+      - /mnt/nas/docker/immich-inspect-poc/model-cache:/cache
+    healthcheck:
+      disable: false
+
+  redis:
+    image: docker.io/valkey/valkey:9
+    container_name: immich_inspect_redis
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD-SHELL', 'redis-cli ping | grep -q PONG']
+      interval: 30s
+      timeout: 5s
+      retries: 5
+
+  database:
+    image: ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0
+    container_name: immich_inspect_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_USER: postgres
+      POSTGRES_DB: immich
+      POSTGRES_INITDB_ARGS: '--data-checksums'
+      DB_STORAGE_TYPE: HDD
+    volumes:
+      - /mnt/nas/docker/immich-inspect-poc/postgres:/var/lib/postgresql/data
+    shm_size: 128mb
+    healthcheck:
+      disable: false
+
+volumes:
+  synology-photos-inspect:
+    driver: local
+    driver_opts:
+      type: nfs
+      o: 'addr=10.0.0.15,ro,hard,nfsvers=3'
+      device: ':/volume1/Media'

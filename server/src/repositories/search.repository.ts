@@ -6,7 +6,7 @@ import { columns } from 'src/database.js';
 import { DummyValue, GenerateSql } from 'src/decorators.js';
 import { MapAsset } from 'src/dtos/asset-response.dto.js';
 import { SearchFilter, SearchOrder } from 'src/dtos/search.dto.js';
-import { AssetStatus, AssetType, AssetVisibility, VectorIndex } from 'src/enum.js';
+import { AssetOrder, AssetStatus, AssetType, AssetVisibility, SearchOrderField, VectorIndex } from 'src/enum.js';
 import { probes } from 'src/repositories/database.repository.js';
 import { DB } from 'src/schema/index.js';
 import { AssetExifTable } from 'src/schema/tables/asset-exif.table.js';
@@ -161,7 +161,12 @@ export type SmartSearchOptions = SearchDateOptions &
   SearchUserIdOptions &
   SearchPeopleOptions &
   SearchTagOptions &
-  SearchOcrOptions & { visibility?: AssetVisibility | 'not-locked'; viewingUserId?: string };
+  SearchOcrOptions & {
+    visibility?: AssetVisibility | 'not-locked';
+    viewingUserId?: string;
+    inspectLimit?: number;
+    order?: SearchOrder;
+  };
 
 export type LargeAssetSearchOptions = AssetSearchOptions & { minFileSize?: number };
 
@@ -322,6 +327,10 @@ export class SearchRepository {
       throw new Error(`Invalid value for 'size': ${pagination.size}`);
     }
 
+    if (options.inspectLimit) {
+      return this.searchSmartInspectLegacy(pagination, options);
+    }
+
     return this.db.transaction().execute(async (trx) => {
       await sql`set local vchordrq.probes = ${sql.lit(probes[VectorIndex.Clip])}`.execute(trx);
       const items = await searchAssetBuilderLegacy(trx, options)
@@ -332,6 +341,69 @@ export class SearchRepository {
         .limit(pagination.size + 1)
         .offset((pagination.page - 1) * pagination.size)
         .execute();
+      return paginationHelper(items, pagination.size);
+    });
+  }
+
+  private searchSmartInspectLegacy(pagination: SearchPaginationOptions, options: SmartSearchOptions) {
+    const inspectLimit = options.inspectLimit!;
+    if (!z.int().min(1).max(1000).validate(inspectLimit)) {
+      throw new Error(`Invalid value for 'inspectLimit': ${inspectLimit}`);
+    }
+
+    return this.db.transaction().execute(async (trx) => {
+      await sql`set local vchordrq.probes = ${sql.lit(probes[VectorIndex.Clip])}`.execute(trx);
+
+      const recalled = await searchAssetBuilderLegacy(trx, options)
+        .select(['asset.id'])
+        .innerJoin('smart_search', 'asset.id', 'smart_search.assetId')
+        .orderBy(sql`smart_search.embedding <=> ${options.embedding}`)
+        .orderBy('asset.id', 'asc')
+        .limit(inspectLimit)
+        .execute();
+
+      const ids = dedupeIds(recalled.map(({ id }) => id));
+      if (ids.length === 0) {
+        return paginationHelper([], pagination.size);
+      }
+
+      if (!options.order) {
+        const idRank = new Map(ids.map((id, index) => [id, index]));
+        const unordered = await searchAssetBuilderLegacy(trx, options)
+          .select(columns.searchAsset)
+          .where('asset.id', 'in', ids)
+          .execute();
+        unordered.sort((a, b) => (idRank.get(a.id) ?? 0) - (idRank.get(b.id) ?? 0));
+        const offset = (pagination.page - 1) * pagination.size;
+        return paginationHelper(unordered.slice(offset, offset + pagination.size + 1), pagination.size);
+      }
+
+      const { field, direction } = options.order;
+      const orderDirection = (direction === AssetOrder.Asc ? 'asc' : 'desc') as OrderByDirection;
+      const needsExif =
+        field === SearchOrderField.FileSizeInBytes || field === SearchOrderField.Rating;
+      const column =
+        field === SearchOrderField.FileCreatedAt
+          ? ('asset.fileCreatedAt' as const)
+          : field === SearchOrderField.FileSizeInBytes
+            ? ('asset_exif.fileSizeInByte' as const)
+            : field === SearchOrderField.Rating
+              ? ('asset_exif.rating' as const)
+              : ('asset.localDateTime' as const);
+
+      const items = await searchAssetBuilderLegacy(trx, options)
+        .select(columns.searchAsset)
+        .where('asset.id', 'in', ids)
+        .$if(needsExif, (qb) => qb.innerJoin('asset_exif', 'asset.id', 'asset_exif.assetId'))
+        .orderBy(column, (ob) => {
+          const ordered = orderDirection === 'asc' ? ob.asc() : ob.desc();
+          return needsExif ? ordered.nullsLast() : ordered;
+        })
+        .orderBy('asset.id', orderDirection)
+        .limit(pagination.size + 1)
+        .offset((pagination.page - 1) * pagination.size)
+        .execute();
+
       return paginationHelper(items, pagination.size);
     });
   }
@@ -568,9 +640,13 @@ export class SearchRepository {
   @GenerateSql(...searchSmartV3Examples)
   searchSmartV3(
     pagination: PaginationOptions,
-    options: Omit<AssetSearchBuilderV3Options, 'order'> & { embedding: string },
+    options: AssetSearchBuilderV3Options & { embedding: string; inspectLimit?: number },
     scope: AssetSearchScope,
   ) {
+    if (options.inspectLimit) {
+      return this.searchSmartInspectV3(pagination, options, scope);
+    }
+
     return this.db.transaction().execute(async (trx) => {
       await sql`set local vchordrq.probes = ${sql.lit(probes[VectorIndex.Clip])}`.execute(trx);
       const items = await searchAssetBuilder(trx, options, scope)
@@ -581,6 +657,58 @@ export class SearchRepository {
         .limit(pagination.take + 1)
         .offset(pagination.skip ?? 0)
         .execute();
+      return paginationHelper(items, pagination.take);
+    });
+  }
+
+  private searchSmartInspectV3(
+    pagination: PaginationOptions,
+    options: AssetSearchBuilderV3Options & { embedding: string; inspectLimit: number },
+    scope: AssetSearchScope,
+  ) {
+    const inspectLimit = options.inspectLimit;
+    if (!z.int().min(1).max(1000).validate(inspectLimit)) {
+      throw new Error(`Invalid value for 'inspectLimit': ${inspectLimit}`);
+    }
+
+    return this.db.transaction().execute(async (trx) => {
+      await sql`set local vchordrq.probes = ${sql.lit(probes[VectorIndex.Clip])}`.execute(trx);
+
+      const recalled = await searchAssetBuilder(trx, options, scope)
+        .select(['asset.id'])
+        .innerJoin('smart_search', 'asset.id', 'smart_search.assetId')
+        .orderBy(sql`smart_search.embedding <=> ${options.embedding}`)
+        .orderBy('asset.id', 'asc')
+        .limit(inspectLimit)
+        .execute();
+
+      const ids = dedupeIds(recalled.map(({ id }) => id));
+      if (ids.length === 0) {
+        return paginationHelper([], pagination.take);
+      }
+
+      const order = options.order;
+
+      if (!order) {
+        const idRank = new Map(ids.map((id, index) => [id, index]));
+        const unordered = await searchAssetBuilder(trx, options, scope)
+          .select(columns.searchAsset)
+          .where('asset.id', 'in', ids)
+          .execute();
+        unordered.sort((a, b) => (idRank.get(a.id) ?? 0) - (idRank.get(b.id) ?? 0));
+        const offset = pagination.skip ?? 0;
+        return paginationHelper(unordered.slice(offset, offset + pagination.take + 1), pagination.take);
+      }
+
+      const items = await withSearchOrder(
+        searchAssetBuilder(trx, options, scope).where('asset.id', 'in', ids) as ReturnType<typeof searchAssetBuilder>,
+        order,
+      )
+        .select(columns.searchAsset)
+        .limit(pagination.take + 1)
+        .offset(pagination.skip ?? 0)
+        .execute();
+
       return paginationHelper(items, pagination.take);
     });
   }
@@ -605,4 +733,17 @@ export class SearchRepository {
       .where(field, 'is not', null)
       .where(field, '!=', '');
   }
+}
+
+function dedupeIds(ids: string[]): string[] {
+  const seen = new Set<string>();
+  const unique: string[] = [];
+  for (const id of ids) {
+    if (seen.has(id)) {
+      continue;
+    }
+    seen.add(id);
+    unique.push(id);
+  }
+  return unique;
 }

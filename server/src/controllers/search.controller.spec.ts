@@ -212,5 +212,17 @@ describe(SearchController.name, () => {
         );
       });
     });
+
+    describe('POST /search/smart', () => {
+      it('should reject an invalid inspectLimit', async () => {
+        const { status, body } = await request(ctx.getHttpServer())
+          .post('/search/smart')
+          .send({ query: 'beach', inspectLimit: 0 });
+        expect(status).toBe(400);
+        expect(body).toEqual(
+          errorDto.validationError([{ path: ['inspectLimit'], message: 'Too small: expected number to be >=1' }]),
+        );
+      });
+    });
   });
 });

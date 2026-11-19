@@ -2,7 +2,7 @@ import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { beforeEach, vitest } from 'vitest';
 import { mapAsset } from 'src/dtos/asset-response.dto.js';
 import { SearchSuggestionType } from 'src/dtos/search.dto.js';
-import { AssetVisibility } from 'src/enum.js';
+import { AssetOrder, AssetVisibility } from 'src/enum.js';
 import { SearchService } from 'src/services/search.service.js';
 import { AssetFactory } from 'test/factories/asset.factory.js';
 import { AuthFactory } from 'test/factories/auth.factory.js';
@@ -337,7 +337,26 @@ describe(SearchService.name, () => {
           userIds: [authStub.user1.user.id],
           viewingUserId: authStub.user1.user.id,
           visibility: 'not-locked',
+          inspectLimit: undefined,
+          order: undefined,
         },
+      );
+    });
+
+    it('should deep-inspect with date-taken order', async () => {
+      await sut.searchSmart(authStub.user1, {
+        size: 100,
+        query: 'test',
+        inspectLimit: 200,
+        order: AssetOrder.Desc,
+      });
+
+      expect(mocks.search.searchSmart).toHaveBeenCalledWith(
+        { page: 1, size: 200 },
+        expect.objectContaining({
+          inspectLimit: 200,
+          order: { field: 'localDateTime', direction: AssetOrder.Desc },
+        }),
       );
     });
 

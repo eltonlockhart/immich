@@ -387,6 +387,8 @@ const StatisticsSearchSchema = withShapeExclusivity(
   }),
 ).meta({ id: 'StatisticsSearchDto' });
 
+const ADDED_V3_5 = new HistoryBuilder().added('v3.5.0').beta('v3.5.0').getExtensions();
+
 const SmartSearchSchema = withShapeExclusivity(
   BaseSearchWithResultsSchema.extend({
     size: z.int().min(1).max(1000).default(100).describe('Number of results to return'),
@@ -394,7 +396,19 @@ const SmartSearchSchema = withShapeExclusivity(
     queryAssetId: z.uuidv4().optional().describe('Asset ID to use as search reference'),
     language: z.string().optional().describe('Search language code'),
     page: z.int().min(1).optional().describe('Page number').meta(DEPRECATED_FLAT_FIELD),
+    inspectLimit: z
+      .int()
+      .min(1)
+      .max(1000)
+      .optional()
+      .describe('Recall the top N assets by embedding distance before deduping and optional reordering')
+      .meta(ADDED_V3_5),
+    order: AssetOrderSchema.optional()
+      .describe('Sort direction when inspectLimit is set (date taken). Omit to keep relevance order after dedupe.')
+      .meta(ADDED_V3_5),
+    orderBy: SearchOrderSchema.optional().meta(ADDED_V3_5),
     filter: filterField,
+    cursor: cursorField,
   }),
 ).meta({ id: 'SmartSearchDto' });
 

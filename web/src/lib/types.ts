@@ -55,6 +55,17 @@ export type SearchDisplayFilters = {
   isFavorite: boolean;
 };
 
+export type SearchInspectFilters = {
+  enabled: boolean;
+  limit: number;
+  order?: 'asc' | 'desc';
+};
+
+export type SmartSearchInspectDto = {
+  inspectLimit?: number;
+  order?: 'asc' | 'desc';
+};
+
 export type SearchLocationFilter = {
   country?: string;
   state?: string;
@@ -72,6 +83,7 @@ export type SearchFilter = {
   camera: SearchCameraFilter;
   date: SearchDateFilter;
   display: SearchDisplayFilters;
+  inspect: SearchInspectFilters;
   mediaType: MediaType;
   rating?: number | null;
 };

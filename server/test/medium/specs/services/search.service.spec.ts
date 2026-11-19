@@ -490,5 +490,35 @@ describe(SearchService.name, () => {
       expect(secondPage.items.length).toBe(1);
       expect(secondPage.hasNextPage).toBe(false);
     });
+
+    it('should deep-inspect: recall by distance, dedupe, and reorder by date taken', async () => {
+      const { ctx } = setup();
+      const { user } = await ctx.newUser();
+      const searchRepository = ctx.get(SearchRepository);
+
+      const dates = [
+        new Date('2020-01-01T12:00:00.000Z'),
+        new Date('2022-06-15T12:00:00.000Z'),
+        new Date('2021-03-10T12:00:00.000Z'),
+      ];
+      const assetIds: string[] = [];
+      for (const [i, fileCreatedAt] of dates.entries()) {
+        const { asset } = await ctx.newAsset({ ownerId: user.id, fileCreatedAt, localDateTime: fileCreatedAt });
+        await searchRepository.upsert(asset.id, unitVector(i));
+        assetIds.push(asset.id);
+      }
+
+      const options = {
+        filter: {},
+        embedding: unitVector(0),
+        inspectLimit: 3,
+        order: { field: SearchOrderField.LocalDateTime, direction: AssetOrder.Desc },
+      };
+      const scope = { userIds: [user.id], lockedOwnerId: user.id };
+      const result = await searchRepository.searchSmartV3({ take: 3 }, options, scope);
+
+      expect(result.items.map(({ id }) => id)).toEqual([assetIds[1], assetIds[2], assetIds[0]]);
+      expect(result.hasNextPage).toBe(false);
+    });
   });
 });

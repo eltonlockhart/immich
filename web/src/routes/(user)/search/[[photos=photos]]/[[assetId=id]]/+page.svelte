@@ -63,7 +63,11 @@
   let scrollY = $state(0);
   let scrollYHistory = 0;
 
-  type SearchTerms = MetadataSearchDto & Pick<SmartSearchDto, 'query' | 'queryAssetId'>;
+  type SearchTerms = MetadataSearchDto &
+    Pick<SmartSearchDto, 'query' | 'queryAssetId'> & {
+      inspectLimit?: number;
+      order?: 'asc' | 'desc';
+    };
   let searchQuery = $derived(page.url.searchParams.get(QueryParameter.QUERY));
   let terms = $derived<SearchTerms>(searchQuery ? JSON.parse(searchQuery) : {});
   let searchTermKeys = $derived(getObjectKeys(terms));
@@ -135,19 +139,27 @@
     }
     isLoading = true;
 
-    const searchDto: SearchTerms = {
+    const { inspectLimit, order, ...filterTerms } = terms;
+    const searchDto = {
       page: nextPage,
       withExif: true,
-      ...terms,
+      ...filterTerms,
     };
 
     try {
-      const { albums, assets } =
-        ('query' in searchDto || 'queryAssetId' in searchDto) && config.machineLearning.clip.enabled
-          ? await searchSmart({
-              smartSearchDto: { visibility: AssetVisibility.Timeline, ...searchDto, language: $lang },
-            })
-          : await searchAssets({ metadataSearchDto: { visibility: AssetVisibility.Timeline, ...searchDto } });
+      const isSmart =
+        ('query' in searchDto || 'queryAssetId' in searchDto) && config.machineLearning.clip.enabled;
+      const { albums, assets } = isSmart
+        ? await searchSmart({
+            smartSearchDto: {
+              visibility: AssetVisibility.Timeline,
+              ...searchDto,
+              language: $lang,
+              inspectLimit,
+              order,
+            } as Parameters<typeof searchSmart>[0]['smartSearchDto'],
+          })
+        : await searchAssets({ metadataSearchDto: { visibility: AssetVisibility.Timeline, ...searchDto } });
 
       searchResultAlbums.push(...albums.items);
       searchResultAssets.push(...assets.items);
@@ -194,6 +206,8 @@
       description: $t('description'),
       queryAssetId: $t('query_asset_id'),
       ocr: $t('ocr'),
+      inspectLimit: $t('search_filter_inspect_title'),
+      order: $t('search_filter_inspect_order'),
     };
     return keyMap[key] || key;
   }
@@ -298,6 +312,10 @@
                 {/await}
               {:else if searchKey === 'rating'}
                 {$t('rating_count', { values: { count: value ?? 0 } })}
+              {:else if searchKey === 'inspectLimit'}
+                {$t('search_filter_inspect_limit', { values: { count: value ?? 0 } })}
+              {:else if searchKey === 'order'}
+                {value === 'asc' ? $t('oldest_first') : $t('newest_first')}
               {:else if value === null || value === ''}
                 {$t('unknown')}
               {:else}

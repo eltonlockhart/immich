@@ -16,13 +16,14 @@ import {
   SearchStatisticsResponseDto,
   SearchSuggestionRequestDto,
   SearchSuggestionType,
+  SearchOrder,
   SmartSearchDto,
   StatisticsSearchDto,
   isFullyAlbumConfined,
   isNewShapeRequest,
   mapPlaces,
 } from 'src/dtos/search.dto.js';
-import { AssetOrder, AssetVisibility, Permission } from 'src/enum.js';
+import { AssetOrder, AssetVisibility, Permission, SearchOrderField } from 'src/enum.js';
 import { AssetSearchScope } from 'src/repositories/search.repository.js';
 import { BaseService } from 'src/services/base.service.js';
 import { requireElevatedPermission } from 'src/utils/access.js';
@@ -182,19 +183,23 @@ export class SearchService extends BaseService {
     const userIds = this.getUserIdsToSearch(auth, dto.visibility);
     const embedding = await this.resolveEmbedding(auth, dto, machineLearning);
     const page = dto.page ?? 1;
-    const size = dto.size;
+    const inspectLimit = dto.inspectLimit;
     const { hasNextPage, items } = await this.searchRepository.searchSmart(
-      { page, size },
+      { page: inspectLimit ? 1 : page, size: inspectLimit ?? dto.size },
       {
         ...dto,
         userIds: await userIds,
         viewingUserId: auth.user.id,
         embedding,
         visibility: dto.visibility ?? (auth.session?.hasElevatedPermission ? undefined : 'not-locked'),
+        inspectLimit,
+        order: this.resolveSmartInspectOrder(dto),
       },
     );
 
-    return this.mapResponse(items, { auth }, { nextPage: hasNextPage ? (page + 1).toString() : null });
+    return this.mapResponse(items, { auth }, {
+      nextPage: inspectLimit ? null : hasNextPage ? (page + 1).toString() : null,
+    });
   }
 
   async getAssetsByCity(auth: AuthDto): Promise<AssetResponseDto[]> {
@@ -289,14 +294,35 @@ export class SearchService extends BaseService {
       this.resolveEmbedding(auth, dto, machineLearning),
     ]);
 
-    // no cursor until a rank-aware pagination strategy for smart search is decided
-    const { items } = await this.searchRepository.searchSmartV3(
-      { take: dto.size },
-      { filter, withExif: dto.withExif, embedding },
+    const take = dto.inspectLimit ?? dto.size;
+    const { items, hasNextPage } = await this.searchRepository.searchSmartV3(
+      { take },
+      {
+        filter,
+        withExif: dto.withExif,
+        embedding,
+        inspectLimit: dto.inspectLimit,
+        order: this.resolveSmartInspectOrder(dto),
+      },
       scope,
     );
 
-    return this.mapResponse(items, { auth });
+    return this.mapResponse(items, { auth }, {
+      nextCursor: dto.inspectLimit || !hasNextPage ? null : undefined,
+    });
+  }
+
+  private resolveSmartInspectOrder(dto: SmartSearchDto): SearchOrder | undefined {
+    if (!dto.inspectLimit) {
+      return undefined;
+    }
+    if (dto.orderBy) {
+      return dto.orderBy;
+    }
+    if (dto.order) {
+      return { field: SearchOrderField.LocalDateTime, direction: dto.order };
+    }
+    return undefined;
   }
 
   private async resolveSearchScopeV3(

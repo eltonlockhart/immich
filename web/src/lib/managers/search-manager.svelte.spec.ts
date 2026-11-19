@@ -32,4 +32,19 @@ describe('SearchManager', () => {
     searchManager.reset();
     expect(searchManager.filter.queryType).toBe('smart');
   });
+
+  it('round-trips smart inspect filters', async () => {
+    searchManager.setQuery({
+      query: 'beach',
+      inspectLimit: 150,
+      order: 'asc',
+    });
+
+    expect(searchManager.filter.queryType).toBe('smart');
+    expect(searchManager.filter.inspect).toEqual({
+      enabled: true,
+      limit: 150,
+      order: 'asc',
+    });
+  });
 });

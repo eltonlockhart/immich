@@ -24,6 +24,7 @@
   import SearchDateSection from './SearchDateSection.svelte';
   import SearchDisplaySection from './SearchDisplaySection.svelte';
   import SearchHistorySection from './SearchHistorySection.svelte';
+  import SearchInspectSection from './SearchInspectSection.svelte';
   import SearchLocationSection from './SearchLocationSection.svelte';
   import SearchMediaSection from './SearchMediaSection.svelte';
   import SearchPeopleSection from './SearchPeopleSection.svelte';
@@ -136,6 +137,7 @@
     searchManager.filter.display.isArchive ||
       searchManager.filter.display.isFavorite ||
       searchManager.filter.display.isNotInAlbum ||
+      searchManager.filter.inspect.enabled ||
       searchManager.filter.camera.make !== undefined ||
       searchManager.filter.camera.model !== undefined ||
       searchManager.filter.camera.lensModel !== undefined ||
@@ -246,6 +248,7 @@
               <SearchRatingsSection />
             {/if}
             <SearchDisplaySection />
+            <SearchInspectSection />
           </div>
         </div>
       </div>

@@ -1,13 +1,22 @@
 import { MediaType, QueryType, validQueryTypes } from '#lib/constants.ts';
 import { Route } from '#lib/route.ts';
-import type { SearchFilter } from '#lib/types.ts';
+import type { SearchFilter, SmartSearchInspectDto } from '#lib/types.ts';
 import { asLocalTimeISO, parseUtcDate } from '#lib/utils/date-time.ts';
-import { AssetTypeEnum, AssetVisibility, type MetadataSearchDto, type SmartSearchDto } from '@immich/sdk';
+import {
+  AssetOrder,
+  AssetTypeEnum,
+  AssetVisibility,
+  type MetadataSearchDto,
+  type SmartSearchDto,
+} from '@immich/sdk';
 import type { DateTime } from 'luxon';
 import { SvelteSet } from 'svelte/reactivity';
 import { goto } from '$app/navigation';
 
 const QUERY_TYPE_STORAGE_KEY = 'searchQueryType';
+const DEFAULT_INSPECT_LIMIT = 200;
+
+type SearchQuery = (MetadataSearchDto | SmartSearchDto) & SmartSearchInspectDto;
 
 class SearchManager {
   #filter = $state<SearchFilter>(this.#fromQuery({}));
@@ -20,7 +29,7 @@ class SearchManager {
     this.#filter = this.#fromQuery({});
   }
 
-  setQuery(query: MetadataSearchDto | SmartSearchDto) {
+  setQuery(query: SearchQuery) {
     this.#filter = this.#fromQuery(query);
   }
 
@@ -33,7 +42,7 @@ class SearchManager {
     await goto(Route.search(this.#toQuery()));
   }
 
-  #fromQuery(searchQuery: MetadataSearchDto | SmartSearchDto): SearchFilter {
+  #fromQuery(searchQuery: SearchQuery): SearchFilter {
     let query = 'query' in searchQuery && searchQuery.query ? searchQuery.query : '';
     let queryType = query ? QueryType.SMART : this.#defaultQueryType();
 
@@ -88,6 +97,11 @@ class SearchManager {
         isFavorite: searchQuery.isFavorite ?? false,
         isNotInAlbum: 'isNotInAlbum' in searchQuery && (searchQuery.isNotInAlbum ?? false),
       },
+      inspect: {
+        enabled: searchQuery.inspectLimit != null,
+        limit: searchQuery.inspectLimit ?? DEFAULT_INSPECT_LIMIT,
+        order: searchQuery.order ?? (searchQuery.inspectLimit != null ? AssetOrder.Desc : undefined),
+      },
       mediaType:
         searchQuery.type === AssetTypeEnum.Image
           ? MediaType.Image
@@ -98,7 +112,7 @@ class SearchManager {
     };
   }
 
-  #toQuery(): MetadataSearchDto | SmartSearchDto {
+  #toQuery(): SearchQuery {
     let type: AssetTypeEnum | undefined = undefined;
     if (this.filter.mediaType === MediaType.Image) {
       type = AssetTypeEnum.Image;
@@ -107,6 +121,13 @@ class SearchManager {
     }
 
     const query = this.filter.query || undefined;
+    const inspect =
+      this.filter.queryType === 'smart' && this.filter.inspect.enabled
+        ? {
+            inspectLimit: this.filter.inspect.limit,
+            order: this.filter.inspect.order,
+          }
+        : {};
 
     return {
       query: this.filter.queryType === 'smart' ? query : undefined,
@@ -134,6 +155,7 @@ class SearchManager {
       tagIds: this.filter.tagIds === null ? null : this.filter.tagIds.size > 0 ? [...this.filter.tagIds] : undefined,
       type,
       rating: this.filter.rating,
+      ...inspect,
     };
   }
 
