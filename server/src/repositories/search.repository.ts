@@ -395,10 +395,9 @@ export class SearchRepository {
         .select(columns.searchAsset)
         .where('asset.id', 'in', ids)
         .$if(needsExif, (qb) => qb.innerJoin('asset_exif', 'asset.id', 'asset_exif.assetId'))
-        .orderBy(column, (ob) => {
-          const ordered = orderDirection === 'asc' ? ob.asc() : ob.desc();
-          return needsExif ? ordered.nullsLast() : ordered;
-        })
+        .orderBy(
+          sql.raw(`${column} ${orderDirection}${needsExif ? ' nulls last' : ''}`),
+        )
         .orderBy('asset.id', orderDirection)
         .limit(pagination.size + 1)
         .offset((pagination.page - 1) * pagination.size)
@@ -644,7 +643,11 @@ export class SearchRepository {
     scope: AssetSearchScope,
   ) {
     if (options.inspectLimit) {
-      return this.searchSmartInspectV3(pagination, options, scope);
+      return this.searchSmartInspectV3(
+        pagination,
+        { ...options, inspectLimit: options.inspectLimit },
+        scope,
+      );
     }
 
     return this.db.transaction().execute(async (trx) => {

@@ -2,7 +2,7 @@
 # Side-by-side PoC on the Portainer host (10.0.0.20).
 # - Cloned Postgres (prod dump) so smart-search embeddings work
 # - Prod library mounted read-only
-# - UI on :2285 (prod :2283, ios-test :2284)
+# - UI on :2284 (prod :2283; ios-test moved off this port for PoC)
 #
 name: immich-inspect-poc
 
@@ -10,12 +10,12 @@ services:
   immich-server:
     image: immich-inspect-poc:latest
     build:
-      context: ..
+      context: https://github.com/eltonlockhart/immich.git#feat/smart-search-inspect
       dockerfile: server/Dockerfile
     container_name: immich_inspect_server
     restart: unless-stopped
     ports:
-      - '2285:2283'
+      - '2284:2283'
     environment:
       TZ: Australia/Brisbane
       DB_HOSTNAME: database
@@ -81,6 +81,7 @@ services:
       DB_STORAGE_TYPE: HDD
     volumes:
       - /mnt/nas/docker/immich-inspect-poc/postgres:/var/lib/postgresql/data
+      - /mnt/nas/docker/immich-inspect-poc/dump:/dump:ro
     shm_size: 128mb
     healthcheck:
       disable: false
