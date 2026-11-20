@@ -10,7 +10,7 @@ services:
   immich-server:
     image: immich-inspect-poc:latest
     build:
-      context: https://github.com/eltonlockhart/immich.git#feat/smart-search-inspect
+      context: https://github.com/eltonlockhart/immich.git#cursor/inspect-poc-build-fix-cbad
       dockerfile: server/Dockerfile
     container_name: immich_inspect_server
     restart: unless-stopped
@@ -54,6 +54,7 @@ services:
       TZ: Australia/Brisbane
       MACHINE_LEARNING_MODEL_REVISION: v2
       MACHINE_LEARNING_WORKERS: '1'
+      MACHINE_LEARNING_MODEL_TTL: '0'
     volumes:
       - /mnt/nas/docker/immich-inspect-poc/model-cache:/cache
     healthcheck:
