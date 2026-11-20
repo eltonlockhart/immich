@@ -45,11 +45,9 @@ services:
       disable: false
 
   immich-machine-learning:
-    image: ghcr.io/immich-app/immich-machine-learning:v3-openvino
+    image: ghcr.io/immich-app/immich-machine-learning:v3
     container_name: immich_inspect_ml
     restart: unless-stopped
-    devices:
-      - /dev/dri:/dev/dri
     environment:
       TZ: Australia/Brisbane
       MACHINE_LEARNING_MODEL_REVISION: v2
