@@ -396,7 +396,9 @@ export class SearchRepository {
         .where('asset.id', 'in', ids)
         .$if(needsExif, (qb) => qb.innerJoin('asset_exif', 'asset.id', 'asset_exif.assetId'))
         .orderBy(
-          sql.raw(`${column} ${orderDirection}${needsExif ? ' nulls last' : ''}`),
+          needsExif
+            ? sql`${sql.ref(column)} ${sql.raw(orderDirection)} nulls last`
+            : sql`${sql.ref(column)} ${sql.raw(orderDirection)}`,
         )
         .orderBy('asset.id', orderDirection)
         .limit(pagination.size + 1)
