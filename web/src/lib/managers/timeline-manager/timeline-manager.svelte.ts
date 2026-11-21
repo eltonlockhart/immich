@@ -309,7 +309,11 @@ export class TimelineManager extends VirtualScrollManager {
       return;
     }
 
-    const { assets: _, deferInit: __, timelineAlbumId: ___, assetFilter: ____, ...bucketOptions } = this.#options;
+    const bucketOptions = { ...this.#options };
+    delete bucketOptions.assets;
+    delete bucketOptions.deferInit;
+    delete bucketOptions.timelineAlbumId;
+    delete bucketOptions.assetFilter;
     const timebuckets = await getTimeBuckets({
       ...authManager.params,
       ...bucketOptions,
