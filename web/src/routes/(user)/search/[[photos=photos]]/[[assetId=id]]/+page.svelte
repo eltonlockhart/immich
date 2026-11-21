@@ -78,15 +78,14 @@
   const useInspectTimeline = $derived(
     terms.inspectLimit != null && (terms.order === 'asc' || terms.order === 'desc'),
   );
-  const inspectTimelineAssets = $derived(searchResultAssets.map((asset) => toTimelineAsset(asset)));
-  const inspectTimelineOptions = $derived({
-    assets: inspectTimelineAssets,
-    order: terms.order === 'asc' ? AssetOrder.Asc : AssetOrder.Desc,
-    visibility: AssetVisibility.Timeline,
-  });
   const inspectTimelineKey = $derived(
-    `${terms.order ?? ''}:${terms.inspectLimit ?? ''}:${inspectTimelineAssets.map((asset) => asset.id).join(',')}`,
+    `${terms.query ?? ''}:${terms.queryAssetId ?? ''}:${terms.order ?? ''}:${terms.inspectLimit ?? ''}`,
   );
+  let inspectTimelineOptions = $state<{
+    assets: TimelineAsset[];
+    order: AssetOrder;
+    visibility: typeof AssetVisibility.Timeline;
+  } | null>(null);
 
   $effect(() => {
     // we want this to *only* be reactive on `terms`
@@ -146,6 +145,7 @@
     nextPage = 1;
     searchResultAssets = [];
     searchResultAlbums = [];
+    inspectTimelineOptions = null;
     await loadNextPage(true);
   }
 
@@ -159,7 +159,7 @@
     const { inspectLimit, order, ...filterTerms } = terms;
     const searchDto = {
       page: nextPage,
-      withExif: true,
+      withExif: false,
       ...filterTerms,
     };
 
@@ -182,6 +182,16 @@
       searchResultAssets.push(...assets.items);
 
       nextPage = Number(assets.nextPage) || 0;
+
+      if (useInspectTimeline && searchResultAssets.length > 0) {
+        inspectTimelineOptions = {
+          assets: searchResultAssets.map((asset) => toTimelineAsset(asset)),
+          order: order === 'asc' ? AssetOrder.Asc : AssetOrder.Desc,
+          visibility: AssetVisibility.Timeline,
+        };
+      } else {
+        inspectTimelineOptions = null;
+      }
     } catch (error) {
       handleError(error, $t('loading_search_results_failed'));
     } finally {
@@ -365,7 +375,7 @@
   bind:this={searchResultsElement}
 >
   <section id="search-content" class={useInspectTimeline ? 'h-full' : undefined}>
-    {#if searchResultAssets.length > 0 && useInspectTimeline}
+    {#if inspectTimelineOptions && useInspectTimeline}
       {#key inspectTimelineKey}
         <Timeline
           enableRouting={false}

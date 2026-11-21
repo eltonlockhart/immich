@@ -123,7 +123,7 @@ export class TimelineManager extends VirtualScrollManager {
       eventManager.on({
         AssetUpdate: (asset: AssetResponseDto) => {
           const timelineAsset = toTimelineAsset(asset);
-          if (this.#options.albumId || this.#options.personId) {
+          if (this.#options.assets || this.#options.albumId || this.#options.personId) {
             this.#updateAssets([timelineAsset]);
           } else {
             this.upsertAssets([timelineAsset]);
@@ -305,7 +305,6 @@ export class TimelineManager extends VirtualScrollManager {
       this.addAssetsUpsertSegments([...this.#options.assets]);
       this.#sortMonths();
       this.updateViewportGeometry(false);
-      this.#createScrubberMonths();
       return;
     }
 
