@@ -6,16 +6,19 @@
   import GalleryViewer from '#lib/components/shared-components/gallery-viewer/GalleryViewer.svelte';
   import SearchBar from '#lib/components/shared-components/search-bar/SearchBar.svelte';
   import AssetSelectControlBar from '#lib/components/timeline/AssetSelectControlBar.svelte';
+  import Timeline from '#lib/components/timeline/Timeline.svelte';
   import ChangeDate from '#lib/components/timeline/actions/ChangeDateAction.svelte';
   import ChangeDescription from '#lib/components/timeline/actions/ChangeDescriptionAction.svelte';
   import ChangeLocation from '#lib/components/timeline/actions/ChangeLocationAction.svelte';
   import DeleteAssets from '#lib/components/timeline/actions/DeleteAssetsAction.svelte';
   import DownloadAction from '#lib/components/timeline/actions/DownloadAction.svelte';
   import FavoriteAction from '#lib/components/timeline/actions/FavoriteAction.svelte';
+  import SelectAllAssets from '#lib/components/timeline/actions/SelectAllAction.svelte';
   import SetVisibilityAction from '#lib/components/timeline/actions/SetVisibilityAction.svelte';
   import { QueryParameter } from '#lib/constants.ts';
   import { assetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
   import { searchManager } from '#lib/managers/search-manager.svelte.ts';
+  import { TimelineManager } from '#lib/managers/timeline-manager/timeline-manager.svelte.ts';
   import type { TimelineAsset, Viewport } from '#lib/managers/timeline-manager/types.ts';
   import { createPreloadedQuery, queryClient } from '#lib/queries/client.ts';
   import { getUserConfigQuery } from '#lib/queries/config-user.query.ts';
@@ -30,6 +33,7 @@
   import { isAlbumsRoute, isPeopleRoute } from '#lib/utils/navigation.ts';
   import { toTimelineAsset } from '#lib/utils/timeline-util.ts';
   import {
+    AssetOrder,
     AssetVisibility,
     searchAssets,
     searchSmart,
@@ -50,7 +54,7 @@
 
   const viewport: Viewport = $state({ width: 0, height: 0 });
   let searchResultsElement: HTMLElement | undefined = $state();
-
+  let timelineManager = $state<TimelineManager>() as TimelineManager;
   // The GalleryViewer pushes it's own history state, which causes weird
   // behavior for history.back(). To prevent that we store the previous page
   // manually and navigate back to that.
@@ -71,6 +75,18 @@
   let searchQuery = $derived(page.url.searchParams.get(QueryParameter.QUERY));
   let terms = $derived<SearchTerms>(searchQuery ? JSON.parse(searchQuery) : {});
   let searchTermKeys = $derived(getObjectKeys(terms));
+  const useInspectTimeline = $derived(
+    terms.inspectLimit != null && (terms.order === 'asc' || terms.order === 'desc'),
+  );
+  const inspectTimelineAssets = $derived(searchResultAssets.map((asset) => toTimelineAsset(asset)));
+  const inspectTimelineOptions = $derived({
+    assets: inspectTimelineAssets,
+    order: terms.order === 'asc' ? AssetOrder.Asc : AssetOrder.Desc,
+    visibility: AssetVisibility.Timeline,
+  });
+  const inspectTimelineKey = $derived(
+    `${terms.order ?? ''}:${terms.inspectLimit ?? ''}:${inspectTimelineAssets.map((asset) => asset.id).join(',')}`,
+  );
 
   $effect(() => {
     // we want this to *only* be reactive on `terms`
@@ -114,6 +130,7 @@
   const onAssetDelete = (assetIds: string[]) => {
     const assetIdSet = new Set(assetIds);
     searchResultAssets = searchResultAssets.filter((asset: AssetResponseDto) => !assetIdSet.has(asset.id));
+    timelineManager?.removeAssets(assetIds);
   };
 
   const handleSetVisibility = (assetIds: string[]) => {
@@ -340,13 +357,26 @@
 {/if}
 
 <section
-  class="m-4 mb-12 max-h-screen bg-immich-bg dark:bg-immich-dark-bg"
+  class="m-4 mb-12 bg-immich-bg dark:bg-immich-dark-bg {useInspectTimeline
+    ? 'h-[calc(100dvh-8rem)] overflow-hidden'
+    : 'max-h-screen'}"
   bind:clientHeight={viewport.height}
   bind:clientWidth={viewport.width}
   bind:this={searchResultsElement}
 >
-  <section id="search-content">
-    {#if searchResultAssets.length > 0}
+  <section id="search-content" class={useInspectTimeline ? 'h-full' : undefined}>
+    {#if searchResultAssets.length > 0 && useInspectTimeline}
+      {#key inspectTimelineKey}
+        <Timeline
+          enableRouting={false}
+          bind:timelineManager
+          options={inspectTimelineOptions}
+          assetInteraction={assetMultiSelectManager}
+          showArchiveIcon={true}
+          onEscape={() => assetMultiSelectManager.clear()}
+        />
+      {/key}
+    {:else if searchResultAssets.length > 0}
       <GalleryViewer
         assets={searchResultAssets}
         assetInteraction={assetMultiSelectManager}
@@ -381,14 +411,18 @@
           <CommandPaletteDefaultProvider name={$t('assets')} actions={Object.values(Actions)} />
 
           <ActionButton action={Actions.CreateSharedLink} />
-          <IconButton
-            shape="round"
-            color="secondary"
-            variant="ghost"
-            aria-label={$t('select_all')}
-            icon={mdiSelectAll}
-            onclick={handleSelectAll}
-          />
+          {#if useInspectTimeline && timelineManager}
+            <SelectAllAssets {timelineManager} assetInteraction={assetMultiSelectManager} />
+          {:else}
+            <IconButton
+              shape="round"
+              color="secondary"
+              variant="ghost"
+              aria-label={$t('select_all')}
+              icon={mdiSelectAll}
+              onclick={handleSelectAll}
+            />
+          {/if}
           <ActionButton action={Actions.AddToAlbum} />
           {#if assetMultiSelectManager.isAllUserOwned}
             <FavoriteAction
@@ -400,6 +434,7 @@
                     asset.isFavorite = isFavorite;
                   }
                 }
+                timelineManager?.update(ids, (asset) => (asset.isFavorite = isFavorite));
               }}
             />
 
@@ -414,7 +449,14 @@
               <SetVisibilityAction menuItem onVisibilitySet={handleSetVisibility} />
               <ActionMenuItem action={Actions.Tag} />
 
-              <DeleteAssets menuItem {onAssetDelete} onUndoDelete={onSearchQueryUpdate} />
+              <DeleteAssets
+                menuItem
+                {onAssetDelete}
+                onUndoDelete={(assets) => {
+                  timelineManager?.upsertAssets(assets);
+                  void onSearchQueryUpdate();
+                }}
+              />
 
               <hr />
               <ActionMenuItem action={Actions.RegenerateThumbnailJob} />

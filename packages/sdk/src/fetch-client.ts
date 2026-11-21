@@ -707,6 +707,8 @@ export type CastResponse = {
 export type DownloadResponse = {
     /** Maximum archive size in bytes */
     archiveSize: number;
+    /** How a downloaded file is exposed to the device */
+    fileTypeExposure: DownloadFileTypeExposure;
     /** Whether to include embedded videos in downloads */
     includeEmbeddedVideos: boolean;
 };
@@ -794,6 +796,8 @@ export type CastUpdate = {
 export type DownloadUpdate = {
     /** Maximum archive size in bytes */
     archiveSize?: number;
+    /** How a downloaded file is exposed to the device */
+    fileTypeExposure?: DownloadFileTypeExposure;
     /** Whether to include embedded videos in downloads */
     includeEmbeddedVideos?: boolean;
 };
@@ -8376,6 +8380,13 @@ export enum CalendarHeatmapType {
 export enum AssetOrder {
     Asc = "asc",
     Desc = "desc"
+}
+/**
+ * How a downloaded file is exposed to the device
+ */
+export enum DownloadFileTypeExposure {
+    Media = "media",
+    File = "file"
 }
 export enum PersonUpdateStrategy {
     Self = "self",

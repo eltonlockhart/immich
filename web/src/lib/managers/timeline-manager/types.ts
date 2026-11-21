@@ -9,6 +9,8 @@ export type TimelineManagerOptions = Omit<AssetApiGetTimeBucketsRequest, 'size'>
   timelineAlbumId?: string;
   deferInit?: boolean;
   assetFilter?: Set<string>;
+  /** When set, build the timeline from these assets instead of calling getTimeBuckets. */
+  assets?: TimelineAsset[];
 };
 
 export type AssetDescriptor = { id: string };

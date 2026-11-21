@@ -85,7 +85,7 @@ export class TimelineManager extends VirtualScrollManager {
   initTask = new CancellableTask(
     () => {
       this.isInitialized = true;
-      if (this.#options.albumId || this.#options.personId) {
+      if (this.#options.albumId || this.#options.personId || this.#options.assets) {
         return;
       }
       this.connect();
@@ -299,9 +299,20 @@ export class TimelineManager extends VirtualScrollManager {
   }
 
   async #initializeTimelineMonths() {
+    this.albumAssets.clear();
+
+    if (this.#options.assets) {
+      this.addAssetsUpsertSegments([...this.#options.assets]);
+      this.#sortMonths();
+      this.updateViewportGeometry(false);
+      this.#createScrubberMonths();
+      return;
+    }
+
+    const { assets: _, deferInit: __, timelineAlbumId: ___, assetFilter: ____, ...bucketOptions } = this.#options;
     const timebuckets = await getTimeBuckets({
       ...authManager.params,
-      ...this.#options,
+      ...bucketOptions,
     });
 
     this.months = timebuckets.map((timeBucket) => {
@@ -315,8 +326,18 @@ export class TimelineManager extends VirtualScrollManager {
         this.#options.orderBy,
       );
     });
-    this.albumAssets.clear();
     this.updateViewportGeometry(false);
+  }
+
+  #sortMonths() {
+    const ascending = this.getAssetOrder() === AssetOrder.Asc;
+    this.months.sort((a, b) => {
+      const yearDiff = ascending ? a.yearMonth.year - b.yearMonth.year : b.yearMonth.year - a.yearMonth.year;
+      if (yearDiff !== 0) {
+        return yearDiff;
+      }
+      return ascending ? a.yearMonth.month - b.yearMonth.month : b.yearMonth.month - a.yearMonth.month;
+    });
   }
 
   async updateOptions(options: TimelineManagerOptions) {
@@ -693,11 +714,7 @@ export class TimelineManager extends VirtualScrollManager {
   }
 
   protected postCreateSegments(): void {
-    this.months.sort((a, b) => {
-      return a.yearMonth.year === b.yearMonth.year
-        ? b.yearMonth.month - a.yearMonth.month
-        : b.yearMonth.year - a.yearMonth.year;
-    });
+    this.#sortMonths();
   }
 
   protected postUpsert(context: GroupInsertionCache): void {
