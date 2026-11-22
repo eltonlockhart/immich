@@ -14,7 +14,7 @@ import { SvelteSet } from 'svelte/reactivity';
 import { goto } from '$app/navigation';
 
 const QUERY_TYPE_STORAGE_KEY = 'searchQueryType';
-const DEFAULT_INSPECT_LIMIT = 200;
+export const DEFAULT_INSPECT_LIMIT = 250;
 
 type SearchQuery = (MetadataSearchDto | SmartSearchDto) & SmartSearchInspectDto;
 

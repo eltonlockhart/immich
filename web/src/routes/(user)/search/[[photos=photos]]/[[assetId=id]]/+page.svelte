@@ -17,7 +17,7 @@
   import SetVisibilityAction from '#lib/components/timeline/actions/SetVisibilityAction.svelte';
   import { QueryParameter } from '#lib/constants.ts';
   import { assetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
-  import { searchManager } from '#lib/managers/search-manager.svelte.ts';
+  import { DEFAULT_INSPECT_LIMIT, searchManager } from '#lib/managers/search-manager.svelte.ts';
   import { TimelineManager } from '#lib/managers/timeline-manager/timeline-manager.svelte.ts';
   import type { TimelineAsset, Viewport } from '#lib/managers/timeline-manager/types.ts';
   import { createPreloadedQuery, queryClient } from '#lib/queries/client.ts';
@@ -42,8 +42,15 @@
     type MetadataSearchDto,
     type SmartSearchDto,
   } from '@immich/sdk';
-  import { ActionButton, CommandPaletteDefaultProvider, Icon, IconButton, LoadingSpinner } from '@immich/ui';
-  import { mdiArrowLeft, mdiClose, mdiDotsVertical, mdiImageOffOutline, mdiSelectAll } from '@mdi/js';
+  import { ActionButton, Button, CommandPaletteDefaultProvider, Icon, IconButton, LoadingSpinner } from '@immich/ui';
+  import {
+    mdiArrowLeft,
+    mdiClose,
+    mdiDotsVertical,
+    mdiImageOffOutline,
+    mdiMagnifyPlusOutline,
+    mdiSelectAll,
+  } from '@mdi/js';
   import { onMount, tick, untrack } from 'svelte';
   import { t } from 'svelte-i18n';
   import { afterNavigate, goto } from '$app/navigation';
@@ -75,6 +82,10 @@
   let searchQuery = $derived(page.url.searchParams.get(QueryParameter.QUERY));
   let terms = $derived<SearchTerms>(searchQuery ? JSON.parse(searchQuery) : {});
   let searchTermKeys = $derived(getObjectKeys(terms));
+  const isSmartContextSearch = $derived(!!terms.query || !!terms.queryAssetId);
+  const canEnterDeepInspect = $derived(
+    isSmartContextSearch && terms.inspectLimit == null && config.machineLearning.clip.enabled,
+  );
   const useInspectTimeline = $derived(
     terms.inspectLimit != null && (terms.order === 'asc' || terms.order === 'desc'),
   );
@@ -305,6 +316,17 @@
     searchManager.setQuery(terms);
   }
 
+  function enterDeepInspect() {
+    const next: SearchTerms = {
+      ...terms,
+      inspectLimit: DEFAULT_INSPECT_LIMIT,
+      order: 'desc',
+    };
+    assetMultiSelectManager.clear();
+    searchManager.setQuery(next);
+    void goto(Route.search(next));
+  }
+
   onMount(() => searchManager.setQuery(terms));
 </script>
 
@@ -363,6 +385,20 @@
         </div>
       {/each}
     </div>
+
+    {#if canEnterDeepInspect}
+      <div class="mt-4 flex w-full justify-center">
+        <Button
+          color="secondary"
+          shape="round"
+          size="small"
+          leadingIcon={mdiMagnifyPlusOutline}
+          onclick={enterDeepInspect}
+        >
+          {$t('search_enter_deep_inspect', { values: { count: DEFAULT_INSPECT_LIMIT } })}
+        </Button>
+      </div>
+    {/if}
   </section>
 {/if}
 
