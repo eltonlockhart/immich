@@ -15,6 +15,11 @@ export async function loadFromTimeBuckets(
     return;
   }
 
+  // Client-provided asset timelines (Inspect) must never widen to a library bucket.
+  if (options.assets) {
+    return;
+  }
+
   const timeBucket = toISOYearMonthUTC(timelineMonth.yearMonth);
   const bucketResponse = await getTimeBucket(
     {

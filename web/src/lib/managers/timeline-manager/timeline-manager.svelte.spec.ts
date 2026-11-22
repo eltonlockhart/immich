@@ -214,6 +214,67 @@ describe('TimelineManager', () => {
     });
   });
 
+  describe('fixed assets timeline (Inspect scope)', () => {
+    test('keeps months scoped after viewport cancel and never calls getTimeBucket', async ({ api }) => {
+      const assets = [
+        deriveLocalDateTimeFromFileCreatedAt(
+          factory.timelineAsset({
+            fileCreatedAt: fromISODateTimeUTCToObject('2024-01-15T12:00:00.000Z'),
+          }),
+        ),
+        deriveLocalDateTimeFromFileCreatedAt(
+          factory.timelineAsset({
+            fileCreatedAt: fromISODateTimeUTCToObject('2024-01-20T12:00:00.000Z'),
+          }),
+        ),
+        deriveLocalDateTimeFromFileCreatedAt(
+          factory.timelineAsset({
+            fileCreatedAt: fromISODateTimeUTCToObject('2024-02-10T12:00:00.000Z'),
+          }),
+        ),
+      ];
+
+      api.on({
+        getTimeBuckets: () => ({ json: [{ count: 9999, timeBucket: '2024-01-01T00:00:00.000Z' }] }),
+        getTimeBucket: () => ({
+          json: toResponseDto(
+            ...factory.many(50, () =>
+              deriveLocalDateTimeFromFileCreatedAt(
+                factory.timelineAsset({
+                  fileCreatedAt: fromISODateTimeUTCToObject('2024-01-01T00:00:00.000Z'),
+                }),
+              ),
+            ),
+          ),
+        }),
+      });
+
+      const timelineManager = new TimelineManager();
+      await timelineManager.updateOptions({
+        assets,
+        assetFilter: new Set(assets.map((asset) => asset.id)),
+      });
+      await timelineManager.updateViewport({ width: 1588, height: 900 });
+
+      expect(timelineManager.assetCount).toBe(3);
+      expect(api.getTimeBuckets).not.toHaveBeenCalled();
+      expect(api.getTimeBucket).not.toHaveBeenCalled();
+
+      const january = getTimelineMonthByDate(timelineManager, { year: 2024, month: 1 })!;
+      expect(january.getAssets().length).toBe(2);
+      expect(january.loader?.executed).toBe(true);
+
+      // Simulate leaving the viewport — must not clear fixed-asset months.
+      january.cancel();
+      expect(january.getAssets().length).toBe(2);
+
+      await timelineManager.loadTimelineMonth({ year: 2024, month: 1 });
+      expect(api.getTimeBucket).not.toHaveBeenCalled();
+      expect(timelineManager.assetCount).toBe(3);
+      expect(january.getAssets().length).toBe(2);
+    });
+  });
+
   describe('loadTimelineMonth ordered by upload date', () => {
     afterEach(() => {
       Settings.defaultZone = 'system';

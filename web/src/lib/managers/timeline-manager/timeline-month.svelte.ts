@@ -92,9 +92,21 @@ export class TimelineMonth {
     this.#viewportProximity = newValue;
     if (isInOrNearViewportUtil(newValue)) {
       void this.timelineManager.loadTimelineMonth(this.yearMonth);
-    } else {
+    } else if (!this.timelineManager.hasFixedAssets) {
+      // Fixed-asset timelines (Inspect) keep their scoped months in memory so
+      // cancel → reload cannot fall through to a full-library time bucket.
       this.cancel();
     }
+  }
+
+  /** Mark this month loaded from a fixed client asset list (no getTimeBucket). */
+  async markLoadedFromFixedAssets() {
+    if (!this.loader || this.loader.executed) {
+      return;
+    }
+    await this.loader.execute(async () => {
+      // Assets were already inserted by TimelineManager.addAssetsUpsertSegments.
+    }, false);
   }
 
   get isInOrNearViewport() {

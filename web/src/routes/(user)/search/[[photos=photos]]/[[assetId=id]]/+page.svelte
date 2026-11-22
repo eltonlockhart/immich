@@ -200,8 +200,11 @@
       nextPage = Number(assets.nextPage) || 0;
 
       if (useInspectTimeline && searchResultAssets.length > 0) {
+        const timelineAssets = searchResultAssets.map((asset) => toTimelineAsset(asset));
         inspectTimelineOptions = {
-          assets: searchResultAssets.map((asset) => toTimelineAsset(asset)),
+          assets: timelineAssets,
+          // Belt-and-suspenders: exclude any non-result ids if a code path tries to insert.
+          assetFilter: new Set(timelineAssets.map((asset) => asset.id)),
           order: order === 'asc' ? AssetOrder.Asc : AssetOrder.Desc,
           visibility: AssetVisibility.Timeline,
         };

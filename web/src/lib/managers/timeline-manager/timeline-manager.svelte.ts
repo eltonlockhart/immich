@@ -104,6 +104,11 @@ export class TimelineManager extends VirtualScrollManager {
   #scrollableElement: HTMLElement | undefined = $state();
   #unsubscribes: Array<() => void> = [];
 
+  /** True when the timeline is built from a fixed client asset list (e.g. Inspect). */
+  get hasFixedAssets() {
+    return this.#options.assets != null;
+  }
+
   get showAssetOwners() {
     return userPreferencesManager.showAssetOwners;
   }
@@ -304,6 +309,11 @@ export class TimelineManager extends VirtualScrollManager {
     if (this.#options.assets) {
       this.addAssetsUpsertSegments([...this.#options.assets]);
       this.#sortMonths();
+      // Mark months fully loaded so viewport cancel cannot clear them and so
+      // scroll / Select All never fall through to getTimeBucket (full library).
+      for (const month of this.months) {
+        await month.markLoadedFromFixedAssets();
+      }
       this.updateViewportGeometry(false);
       return;
     }
@@ -434,6 +444,33 @@ export class TimelineManager extends VirtualScrollManager {
     }
 
     if (timelineMonth.loader?.executed) {
+      return;
+    }
+
+    // Fixed-asset timelines (Inspect) must never call getTimeBucket.
+    if (this.#options.assets) {
+      const executionStatus = await timelineMonth.loader?.execute(async () => {
+        if (timelineMonth.getFirstAsset()) {
+          return;
+        }
+        const orderBy = this.#options.orderBy || AssetOrderBy.TakenAt;
+        const monthAssets = this.#options.assets!.filter((asset) => {
+          const date = getOrderingDate(asset, orderBy);
+          return date.year === yearMonth.year && date.month === yearMonth.month;
+        });
+        if (monthAssets.length === 0) {
+          return;
+        }
+        const context = new GroupInsertionCache();
+        for (const asset of monthAssets) {
+          timelineMonth.addTimelineAsset(asset, context);
+        }
+        this.postUpsert(context);
+      }, cancelable);
+      if (executionStatus === 'LOADED') {
+        updateGeometry(this, timelineMonth, { invalidateHeight: false });
+        this.updateViewportProximities();
+      }
       return;
     }
 
@@ -697,6 +734,10 @@ export class TimelineManager extends VirtualScrollManager {
 
   canInsertAssetFromLiveEvent(asset: TimelineAsset) {
     if (this.isExcluded(asset)) {
+      return false;
+    }
+    // Never grow a fixed Inspect/search result set from live events.
+    if (this.#options.assets) {
       return false;
     }
     if (this.#options.albumId || this.#options.personId || this.#options.timelineAlbumId) {
