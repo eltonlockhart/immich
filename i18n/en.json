@@ -1953,6 +1953,7 @@
   "search_filter_inspect_enable": "Deep inspect",
   "search_filter_inspect_limit": "Include top {count} matches",
   "search_filter_inspect_order": "Order inspect window",
+  "search_filter_inspect_order_tap_reverse": "Tap again to reverse newest ↔ oldest",
   "search_filter_inspect_relevance": "Relevance",
   "search_filter_inspect_title": "Smart search inspect",
   "search_filter_location": "Location",

@@ -347,6 +347,17 @@
     applyInspectLimit(limit);
   }
 
+  /** Flip Newest ↔ Oldest on the results chip; Relevance has no order chip to tap. */
+  function toggleInspectDateOrder() {
+    if (terms.order !== 'asc' && terms.order !== 'desc') {
+      return;
+    }
+    applyInspectLimit(
+      terms.inspectLimit ?? DEFAULT_INSPECT_LIMIT,
+      terms.order === 'asc' ? 'desc' : 'asc',
+    );
+  }
+
   onMount(() => searchManager.setQuery(terms));
 </script>
 
@@ -384,7 +395,15 @@
               {:else if searchKey === 'inspectLimit'}
                 {$t('search_filter_inspect_limit', { values: { count: value ?? 0 } })}
               {:else if searchKey === 'order'}
-                {value === 'asc' ? $t('oldest_first') : $t('newest_first')}
+                <button
+                  type="button"
+                  class="max-w-full truncate rounded-full px-1 py-0.5 text-start outline-offset-2 outline-immich-primary hover:bg-primary/10 focus-visible:outline-2 dark:outline-immich-dark-primary dark:hover:bg-immich-dark-primary/15"
+                  title={$t('search_filter_inspect_order_tap_reverse')}
+                  aria-label={$t('search_filter_inspect_order_tap_reverse')}
+                  onclick={toggleInspectDateOrder}
+                >
+                  {value === 'asc' ? $t('oldest_first') : $t('newest_first')}
+                </button>
               {:else if value === null || value === ''}
                 {$t('unknown')}
               {:else}

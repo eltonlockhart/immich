@@ -11,6 +11,15 @@
 
   let inspect = $derived(searchManager.filter.inspect);
   let isSmart = $derived(searchManager.filter.queryType === 'smart');
+
+  /** Tap active Newest/Oldest to flip; otherwise select that date order. Relevance never flips. */
+  function setOrFlipDateOrder(target: AssetOrder) {
+    if (inspect.order === target) {
+      inspect.order = target === AssetOrder.Desc ? AssetOrder.Asc : AssetOrder.Desc;
+      return;
+    }
+    inspect.order = target;
+  }
 </script>
 
 {#if isSmart}
@@ -56,12 +65,14 @@
           <SearchButton
             checked
             active={inspect.order === AssetOrder.Desc}
-            onclick={() => (inspect.order = AssetOrder.Desc)}>{$t('newest_first')}</SearchButton
+            title={$t('search_filter_inspect_order_tap_reverse')}
+            onclick={() => setOrFlipDateOrder(AssetOrder.Desc)}>{$t('newest_first')}</SearchButton
           >
           <SearchButton
             checked
             active={inspect.order === AssetOrder.Asc}
-            onclick={() => (inspect.order = AssetOrder.Asc)}>{$t('oldest_first')}</SearchButton
+            title={$t('search_filter_inspect_order_tap_reverse')}
+            onclick={() => setOrFlipDateOrder(AssetOrder.Asc)}>{$t('oldest_first')}</SearchButton
           >
           <SearchButton checked active={inspect.order === undefined} onclick={() => (inspect.order = undefined)}
             >{$t('search_filter_inspect_relevance')}</SearchButton
