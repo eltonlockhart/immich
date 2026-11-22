@@ -82,10 +82,15 @@
   let searchQuery = $derived(page.url.searchParams.get(QueryParameter.QUERY));
   let terms = $derived<SearchTerms>(searchQuery ? JSON.parse(searchQuery) : {});
   let searchTermKeys = $derived(getObjectKeys(terms));
+  const INSPECT_LIMIT_MIN = 50;
+  const INSPECT_LIMIT_MAX = 500;
+  const INSPECT_LIMIT_STEP = 50;
+
   const isSmartContextSearch = $derived(!!terms.query || !!terms.queryAssetId);
   const canEnterDeepInspect = $derived(
     isSmartContextSearch && terms.inspectLimit == null && config.machineLearning.clip.enabled,
   );
+  const isDeepInspect = $derived(isSmartContextSearch && terms.inspectLimit != null);
   const useInspectTimeline = $derived(
     terms.inspectLimit != null && (terms.order === 'asc' || terms.order === 'desc'),
   );
@@ -317,14 +322,26 @@
   }
 
   function enterDeepInspect() {
+    applyInspectLimit(DEFAULT_INSPECT_LIMIT, 'desc');
+  }
+
+  function applyInspectLimit(limit: number, order: SearchTerms['order'] = terms.order ?? 'desc') {
     const next: SearchTerms = {
       ...terms,
-      inspectLimit: DEFAULT_INSPECT_LIMIT,
-      order: 'desc',
+      inspectLimit: limit,
+      order,
     };
     assetMultiSelectManager.clear();
     searchManager.setQuery(next);
     void goto(Route.search(next));
+  }
+
+  function onInspectLimitInput(event: Event) {
+    const limit = Number((event.currentTarget as HTMLInputElement).value);
+    if (!Number.isFinite(limit) || limit === terms.inspectLimit) {
+      return;
+    }
+    applyInspectLimit(limit);
   }
 
   onMount(() => searchManager.setQuery(terms));
@@ -387,7 +404,7 @@
     </div>
 
     {#if canEnterDeepInspect}
-      <div class="mt-4 flex w-full justify-center">
+      <div class="mt-4 flex w-full flex-col items-center gap-2">
         <Button
           color="secondary"
           shape="round"
@@ -397,6 +414,31 @@
         >
           {$t('search_enter_deep_inspect', { values: { count: DEFAULT_INSPECT_LIMIT } })}
         </Button>
+        <p class="max-w-md text-center text-xs text-gray-500 dark:text-gray-400">
+          {$t('search_enter_deep_inspect_hint')}
+        </p>
+      </div>
+    {:else if isDeepInspect}
+      <div class="mx-auto mt-4 flex w-full max-w-xl flex-col gap-2 px-2">
+        <div class="flex items-center justify-between gap-3">
+          <label class="text-sm font-medium text-immich-fg dark:text-immich-dark-fg" for="search-inspect-limit">
+            {$t('search_filter_inspect_limit', { values: { count: terms.inspectLimit ?? DEFAULT_INSPECT_LIMIT } })}
+          </label>
+          {#if isLoading}
+            <LoadingSpinner size="large" />
+          {/if}
+        </div>
+        <input
+          id="search-inspect-limit"
+          type="range"
+          min={INSPECT_LIMIT_MIN}
+          max={INSPECT_LIMIT_MAX}
+          step={INSPECT_LIMIT_STEP}
+          value={terms.inspectLimit ?? DEFAULT_INSPECT_LIMIT}
+          disabled={isLoading}
+          onchange={onInspectLimitInput}
+          class="w-full accent-immich-primary disabled:opacity-60 dark:accent-immich-dark-primary"
+        />
       </div>
     {/if}
   </section>
